@@ -3,19 +3,18 @@ defmodule Base64 do
   @base64_charset "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
   @base64_table @base64_charset
                 |> :binary.bin_to_list()
-    #|> Enum.map(fn <<x>> -> x end)
+                # |> Enum.map(fn <<x>> -> x end)
                 |> List.to_tuple()
 
-  #todo?
+  # todo?
   # read how binary are implented in erlang
   # maybe make functions
   # since map with greater than 32 elements is not that efficient in erlang?
   # try benchmarking
-  @base64_rev_table @base64_charset 
-    |> String.graphemes()
-    |> Enum.with_index()
-    |> Map.new()
-
+  @base64_rev_table @base64_charset
+                    |> String.graphemes()
+                    |> Enum.with_index()
+                    |> Map.new()
 
   # A bitstring having total number of bits equal to multiple of 8 is bianry.
   def encode(input, opts \\ []) when is_binary(input) do
@@ -62,7 +61,6 @@ defmodule Base64 do
     elem(@base64_table, a)
   end
 
-
   # decode
   # convert four byte to 3 byte
   # todo: handle padding in decoding
@@ -78,6 +76,7 @@ defmodule Base64 do
   defp do_decode(<<a::binary-size(1), b::binary-size(1), "==">>, result, padding?) do
     a = base64_to_sextet(a)
     b = base64_to_sextet(b)
+
     if a && b do
       <<decoded_block::binary-size(1), _::4>> = <<a::6, b::6>>
       result <> decoded_block
@@ -87,7 +86,11 @@ defmodule Base64 do
   end
 
   # will decode to 2 bytes (18 -> 16 bits)
-  defp do_decode(<<a::binary-size(1), b::binary-size(1), c::binary-size(1), "=">>, result, padding?) do
+  defp do_decode(
+         <<a::binary-size(1), b::binary-size(1), c::binary-size(1), "=">>,
+         result,
+         padding?
+       ) do
     a = base64_to_sextet(a)
     b = base64_to_sextet(b)
     c = base64_to_sextet(c)
@@ -100,7 +103,7 @@ defmodule Base64 do
     end
   end
 
-  #todo handle whitespace and write test
+  # todo handle whitespace and write test
   defp do_decode(<<block::binary-size(4), rest::binary>>, result, padding?) do
     # each bitstring is 1 byte by default
     <<a::binary-size(1), b::binary-size(1), c::binary-size(1), d::binary-size(1)>> = block
@@ -111,7 +114,7 @@ defmodule Base64 do
     d = base64_to_sextet(d)
 
     if a && b && c && d do
-      decoded_block = << a::6 ,b::6 ,c::6 ,d::6>>
+      decoded_block = <<a::6, b::6, c::6, d::6>>
       do_decode(rest, result <> decoded_block, padding?)
     else
       {:error, :invalid_base64_encoding}

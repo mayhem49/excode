@@ -40,6 +40,7 @@ defmodule Base64Test do
 
   test "performs encoding" do
     strings_to_check = @strings_to_check
+
     Enum.each(strings_to_check, fn str ->
       assert Base.encode64(str) == Base64.encode(str)
     end)
@@ -47,6 +48,7 @@ defmodule Base64Test do
 
   test "performs encoding without padding" do
     strings_to_check = @strings_to_check
+
     Enum.each(strings_to_check, fn str ->
       assert Base.encode64(str, padding: false) == Base64.encode(str, padding: false)
     end)
@@ -55,13 +57,13 @@ defmodule Base64Test do
   test "performs decoding" do
     str = "abcdef"
     encoded_str = Base64.encode(str) |> IO.inspect(label: :encoded)
-    assert str ==  Base64.decode(encoded_str) |> IO.inspect(label: :decoded)
-
+    assert str == Base64.decode(encoded_str) |> IO.inspect(label: :decoded)
 
     strings_to_check = @strings_to_check
+
     Enum.each(strings_to_check, fn str ->
-    encoded_str = Base64.encode(str)
-    assert str ==  Base64.decode(encoded_str) 
+      encoded_str = Base64.encode(str)
+      assert str == Base64.decode(encoded_str)
     end)
   end
 end
