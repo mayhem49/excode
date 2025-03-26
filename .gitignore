@@ -21,3 +21,6 @@ excode-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+.tasks
+.lexical
