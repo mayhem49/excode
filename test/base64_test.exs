@@ -2,6 +2,8 @@ defmodule Base64Test do
   use ExUnit.Case
 
   @invalid_base64_strings [
+    "==ab",
+    "=abc",
     # Contains invalid special characters
     "abc$%^",
     # completely invalid
@@ -66,16 +68,31 @@ defmodule Base64Test do
     end)
   end
 
-  test "performs decoding" do
+  test "performs decoding with padded base64" do
     str = "abcdef"
-    encoded_str = Base64.encode(str) |> IO.inspect(label: :encoded)
-    assert str == Base64.decode(encoded_str) |> IO.inspect(label: :decoded)
+    encoded_str = Base64.encode(str, padding: true) |> IO.inspect(label: :encoded)
+    assert str == Base64.decode(encoded_str, padding: true) |> IO.inspect(label: :decoded)
 
     strings_to_check = @strings_to_check
 
     Enum.each(strings_to_check, fn str ->
-      encoded_str = Base64.encode(str)
-      assert str == Base64.decode(encoded_str)
+      encoded_str = Base64.encode(str, padding: true)
+      assert str == Base64.decode(encoded_str, padding: true)
+    end)
+  end
+
+  test "performs decoding of base64 string without padding" do
+    str = "abcdef"
+    encoded_str = Base64.encode(str, padding: false) |> IO.inspect(label: :encoded)
+    assert str == Base64.decode(encoded_str, padding: false) |> IO.inspect(label: :decoded)
+
+    strings_to_check = @strings_to_check
+
+    Enum.each(strings_to_check, fn str ->
+      # just fun
+      encoder_fun = Enum.random([&Base.encode64/2, &Base64.encode/2])
+      encoded_str = encoder_fun.(str, padding: false)
+      assert str == Base64.decode(encoded_str, padding: false)
     end)
   end
 

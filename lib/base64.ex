@@ -6,16 +6,6 @@ defmodule Base64 do
                 # |> Enum.map(fn <<x>> -> x end)
                 |> List.to_tuple()
 
-  # todo?
-  # read how binary are implented in erlang
-  # maybe make functions
-  # since map with greater than 32 elements is not that efficient in erlang?
-  # try benchmarking
-  @base64_rev_table @base64_charset
-                    |> String.graphemes()
-                    |> Enum.with_index()
-                    |> Map.new()
-
   # A bitstring having total number of bits equal to multiple of 8 is bianry.
   def encode(input, opts \\ []) when is_binary(input) do
     padding? = Keyword.get(opts, :padding, true)
@@ -68,7 +58,7 @@ defmodule Base64 do
     do_decode(input, <<>>, padding?)
   end
 
-  defp do_decode(<<>>, result, padding?), do: result
+  defp do_decode(<<>>, result, _padding?), do: result
 
   # padless decoding allow multiple strings to decode into same bytes
   # only matters when last block is less than four base64 byte
@@ -103,47 +93,54 @@ defmodule Base64 do
     end
   end
 
-  defp do_decode_four_byte(
-         <<a::binary-size(1), b::binary-size(1), c::binary-size(1), d::binary-size(1)>>
-       ) do
-    a = base64_to_sextet(a)
-    b = base64_to_sextet(b)
-    c = base64_to_sextet(c)
-    d = base64_to_sextet(d)
+  # maybe refactor do_decode_*_byte to sigle fucntion to remove manual expansion and instead use Enum functions
+  # but it's not too bad, i guess?
 
-    if a && b && c && d do
-      {:ok, <<a::6, b::6, c::6, d::6>>}
-    else
-      {:error, :invalid_base64_encoding}
-    end
-  end
-
-  defp do_decode_two_byte(<<a::binary-size(1), b::binary-size(1)>>) do
-    a = base64_to_sextet(a)
-    b = base64_to_sextet(b)
-
-    if a && b do
+  # using 8 instead of binary-size(1), cause it was too verbose
+  defp do_decode_two_byte(<<a::8, b::8>>) do
+    with {:ok, a} <- base64_to_sextet(a),
+         {:ok, b} <- base64_to_sextet(b) do
       <<decoded_block::binary-size(1), _::4>> = <<a::6, b::6>>
       {:ok, decoded_block}
-    else
-      {:error, :invalid_base64_encoding}
     end
   end
 
-  defp do_decode_three_byte(<<a::binary-size(1), b::binary-size(1), c::binary-size(1)>>) do
-    a = base64_to_sextet(a)
-    b = base64_to_sextet(b)
-    c = base64_to_sextet(c)
-
-    if a && b && c do
+  defp do_decode_three_byte(<<a::8, b::8, c::8>>) do
+    with {:ok, a} <- base64_to_sextet(a),
+         {:ok, b} <- base64_to_sextet(b),
+         {:ok, c} <- base64_to_sextet(c) do
       <<decoded_block::binary-size(2), _::2>> = <<a::6, b::6, c::6>>
       {:ok, decoded_block}
-    else
-      {:error, :invalid_base64_encoding}
     end
   end
 
-  defp base64_to_sextet(a) do
-    Map.get(@base64_rev_table, a)
+  defp do_decode_four_byte(<<a::8, b::8, c::8, d::8>>) do
+    with {:ok, a} <- base64_to_sextet(a),
+         {:ok, b} <- base64_to_sextet(b),
+         {:ok, c} <- base64_to_sextet(c),
+         {:ok, d} <- base64_to_sextet(d) do
+      # IO.inspect("#{a} #{b} #{c} #{d}")
+      {:ok, <<a::6, b::6, c::6, d::6>>}
+    end
+  end
+
+  # todo: bench mark against previous version
+  def base64_to_sextet(a) do
+    a =
+      case a do
+        # uppercase
+        a when a >= ?A and a <= ?Z -> a - ?A
+        # lowercase
+        a when a >= ?a and a <= ?z -> 26 + a - ?a
+        # digits
+        a when a >= ?0 and a <= ?9 -> 52 + a - ?0
+        # +
+        ?+ -> 62
+        # /
+        ?/ -> 63
+        _ -> nil
+      end
+
+    if a, do: {:ok, a}, else: {:error, :invalid_base64_encoding}
   end
 end
