@@ -34,17 +34,14 @@ defmodule Base64 do
     <<a::6, b::6, c::6>> = <<block::bitstring, 0::2>>
     pad = if padding?, do: "=", else: ""
     encoded_block = <<sextet_to_base64(a), sextet_to_base64(b), sextet_to_base64(c)>> <> pad
+
     result <> encoded_block
   end
 
   defp do_encode(<<block::binary-size(3), rest::binary>>, result, padding?) do
-    encoded_block = encode_block(block)
-    do_encode(rest, result <> encoded_block, padding?)
-  end
-
-  defp encode_block(<<block::binary-size(3)>>) do
     <<a::6, b::6, c::6, d::6>> = block
-    <<sextet_to_base64(a), sextet_to_base64(b), sextet_to_base64(c), sextet_to_base64(d)>>
+    encoded_block = <<sextet_to_base64(a), sextet_to_base64(b), sextet_to_base64(c), sextet_to_base64(d)>>
+    do_encode(rest, result <> encoded_block, padding?)
   end
 
   defp sextet_to_base64(a) do
@@ -119,7 +116,6 @@ defmodule Base64 do
          {:ok, b} <- base64_to_sextet(b),
          {:ok, c} <- base64_to_sextet(c),
          {:ok, d} <- base64_to_sextet(d) do
-      # IO.inspect("#{a} #{b} #{c} #{d}")
       {:ok, <<a::6, b::6, c::6, d::6>>}
     end
   end
