@@ -1,6 +1,18 @@
 defmodule Base64Test do
   use ExUnit.Case
 
+  @invalid_base64_strings [
+    # Contains invalid special characters
+    "abc$%^",
+    # completely invalid
+    "!!!!!",
+    # Space inside a Base64 string
+    "ABCD EFGH",
+    # Invalid character '@' in encoded string
+    "aGVsbG8@",
+    # Triple padding, which is invalid
+    "YQ==="
+  ]
   @strings_to_check [
     # long string
     "adfjlasjfl;asjfkjaskdfljasjjfasdlf;kas",
@@ -64,6 +76,12 @@ defmodule Base64Test do
     Enum.each(strings_to_check, fn str ->
       encoded_str = Base64.encode(str)
       assert str == Base64.decode(encoded_str)
+    end)
+  end
+
+  test "returns error when invalid base64 string is provided to decode" do
+    Enum.each(@invalid_base64_strings, fn invalid_str ->
+      assert {:error, _} = Base64.decode(invalid_str)
     end)
   end
 end

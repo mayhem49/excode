@@ -63,8 +63,6 @@ defmodule Base64 do
 
   # decode
   # convert four byte to 3 byte
-  # todo: handle padding in decoding
-
   def decode(input, opts \\ []) do
     padding? = Keyword.get(opts, :padding, true)
     do_decode(input, <<>>, padding?)
@@ -72,50 +70,74 @@ defmodule Base64 do
 
   defp do_decode(<<>>, result, padding?), do: result
 
-  # will decode to 1 byte (12 -> 8 bits)
-  defp do_decode(<<a::binary-size(1), b::binary-size(1), "==">>, result, padding?) do
-    a = base64_to_sextet(a)
-    b = base64_to_sextet(b)
-
-    if a && b do
-      <<decoded_block::binary-size(1), _::4>> = <<a::6, b::6>>
+  # padless decoding allow multiple strings to decode into same bytes
+  # only matters when last block is less than four base64 byte
+  # todo: example?
+  defp do_decode(<<ab::binary-size(2)>>, result, false) do
+    with {:ok, decoded_block} <- do_decode_two_byte(ab) do
       result <> decoded_block
-    else
-      {:error, :invalid_base64_encoding}
     end
   end
 
-  # will decode to 2 bytes (18 -> 16 bits)
-  defp do_decode(
-         <<a::binary-size(1), b::binary-size(1), c::binary-size(1), "=">>,
-         result,
-         padding?
-       ) do
-    a = base64_to_sextet(a)
-    b = base64_to_sextet(b)
-    c = base64_to_sextet(c)
-
-    if a && b && c do
-      <<decoded_block::binary-size(2), _::2>> = <<a::6, b::6, c::6>>
+  defp do_decode(<<abc::binary-size(3)>>, result, false) do
+    with {:ok, decoded_block} <- do_decode_three_byte(abc) do
       result <> decoded_block
-    else
-      {:error, :invalid_base64_encoding}
     end
+  end
+
+  # when padding is enabled, then no of bytes is multiple of 4 with padding.
+  # will decode to 1 byte (12 -> 8 bits)
+  defp do_decode(<<ab::binary-size(2), "==">>, result, _padding? = true) do
+    do_decode(ab, result, false)
+  end
+
+  # will decode to 2 bytes (18 -> 16 bits)
+  defp do_decode(<<abc::binary-size(3), "=">>, result, _padding? = true) do
+    do_decode(abc, result, false)
   end
 
   # todo handle whitespace and write test
   defp do_decode(<<block::binary-size(4), rest::binary>>, result, padding?) do
-    # each bitstring is 1 byte by default
-    <<a::binary-size(1), b::binary-size(1), c::binary-size(1), d::binary-size(1)>> = block
+    with {:ok, decoded_block} <- do_decode_four_byte(block) do
+      do_decode(rest, result <> decoded_block, padding?)
+    end
+  end
 
+  defp do_decode_four_byte(
+         <<a::binary-size(1), b::binary-size(1), c::binary-size(1), d::binary-size(1)>>
+       ) do
     a = base64_to_sextet(a)
     b = base64_to_sextet(b)
     c = base64_to_sextet(c)
     d = base64_to_sextet(d)
 
     if a && b && c && d do
-      decoded_block = <<a::6, b::6, c::6, d::6>>
-      do_decode(rest, result <> decoded_block, padding?)
+      {:ok, <<a::6, b::6, c::6, d::6>>}
+    else
+      {:error, :invalid_base64_encoding}
+    end
+  end
+
+  defp do_decode_two_byte(<<a::binary-size(1), b::binary-size(1)>>) do
+    a = base64_to_sextet(a)
+    b = base64_to_sextet(b)
+
+    if a && b do
+      <<decoded_block::binary-size(1), _::4>> = <<a::6, b::6>>
+      {:ok, decoded_block}
+    else
+      {:error, :invalid_base64_encoding}
+    end
+  end
+
+  defp do_decode_three_byte(<<a::binary-size(1), b::binary-size(1), c::binary-size(1)>>) do
+    a = base64_to_sextet(a)
+    b = base64_to_sextet(b)
+    c = base64_to_sextet(c)
+
+    if a && b && c do
+      <<decoded_block::binary-size(2), _::2>> = <<a::6, b::6, c::6>>
+      {:ok, decoded_block}
     else
       {:error, :invalid_base64_encoding}
     end

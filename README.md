@@ -5,4 +5,6 @@ Implementing encoding and decoding mechanism of various formats, primarily to ga
 [x] base64
 
 # TODO
+[] handle whitespace
+[] test for non ascii
 
