@@ -40,7 +40,10 @@ defmodule Base64 do
 
   defp do_encode(<<block::binary-size(3), rest::binary>>, result, padding?) do
     <<a::6, b::6, c::6, d::6>> = block
-    encoded_block = <<sextet_to_base64(a), sextet_to_base64(b), sextet_to_base64(c), sextet_to_base64(d)>>
+
+    encoded_block =
+      <<sextet_to_base64(a), sextet_to_base64(b), sextet_to_base64(c), sextet_to_base64(d)>>
+
     do_encode(rest, result <> encoded_block, padding?)
   end
 
@@ -50,25 +53,48 @@ defmodule Base64 do
 
   # decode
   # convert four byte to 3 byte
-  def decode(input, opts \\ []) do
+  def decode!(input, opts \\ []) when is_binary(input) do
+    case decode(input, opts) do
+      {:ok, result} -> result
+      {:error, reason} -> raise "couldn't decode due to #{reason}"
+    end
+  end
+
+  def decode(input, opts \\ []) when is_binary(input) do
     padding? = Keyword.get(opts, :padding, true)
     do_decode(input, <<>>, padding?)
   end
 
-  defp do_decode(<<>>, result, _padding?), do: result
+  defp do_decode(<<>>, result, _padding?), do: {:ok, result}
 
-  # padless decoding allow multiple strings to decode into same bytes
-  # only matters when last block is less than four base64 byte
-  # todo: example?
   defp do_decode(<<ab::binary-size(2)>>, result, false) do
-    with {:ok, decoded_block} <- do_decode_two_byte(ab) do
-      result <> decoded_block
+    # using 8 instead of binary-size(1), cause it was too verbose
+    # remember using absoulte size gives integer, unlike binary-size that gives binary
+    <<a::8, b::8>> = ab
+
+    with {:ok, a} <- base64_to_sextet(a),
+         {:ok, b} <- base64_to_sextet(b) do
+      <<decoded_block::binary-size(1), padded_bits::4>> = <<a::6, b::6>>
+
+      case padded_bits do
+        0 -> {:ok, result <> decoded_block}
+        _ -> {:error, :invalid_base64_encoding}
+      end
     end
   end
 
   defp do_decode(<<abc::binary-size(3)>>, result, false) do
-    with {:ok, decoded_block} <- do_decode_three_byte(abc) do
-      result <> decoded_block
+    <<a::8, b::8, c::8>> = abc
+
+    with {:ok, a} <- base64_to_sextet(a),
+         {:ok, b} <- base64_to_sextet(b),
+         {:ok, c} <- base64_to_sextet(c) do
+      <<decoded_block::binary-size(2), padded_bits::2>> = <<a::6, b::6, c::6>>
+
+      case padded_bits do
+        0 -> {:ok, result <> decoded_block}
+        _ -> {:error, :invalid_base64_encoding}
+      end
     end
   end
 
@@ -85,39 +111,20 @@ defmodule Base64 do
 
   # todo handle whitespace and write test
   defp do_decode(<<block::binary-size(4), rest::binary>>, result, padding?) do
-    with {:ok, decoded_block} <- do_decode_four_byte(block) do
-      do_decode(rest, result <> decoded_block, padding?)
-    end
-  end
+    <<a::8, b::8, c::8, d::8>> = block
 
-  # maybe refactor do_decode_*_byte to sigle fucntion to remove manual expansion and instead use Enum functions
-  # but it's not too bad, i guess?
-
-  # using 8 instead of binary-size(1), cause it was too verbose
-  defp do_decode_two_byte(<<a::8, b::8>>) do
-    with {:ok, a} <- base64_to_sextet(a),
-         {:ok, b} <- base64_to_sextet(b) do
-      <<decoded_block::binary-size(1), _::4>> = <<a::6, b::6>>
-      {:ok, decoded_block}
-    end
-  end
-
-  defp do_decode_three_byte(<<a::8, b::8, c::8>>) do
-    with {:ok, a} <- base64_to_sextet(a),
-         {:ok, b} <- base64_to_sextet(b),
-         {:ok, c} <- base64_to_sextet(c) do
-      <<decoded_block::binary-size(2), _::2>> = <<a::6, b::6, c::6>>
-      {:ok, decoded_block}
-    end
-  end
-
-  defp do_decode_four_byte(<<a::8, b::8, c::8, d::8>>) do
     with {:ok, a} <- base64_to_sextet(a),
          {:ok, b} <- base64_to_sextet(b),
          {:ok, c} <- base64_to_sextet(c),
          {:ok, d} <- base64_to_sextet(d) do
-      {:ok, <<a::6, b::6, c::6, d::6>>}
+      decoded_block = <<a::6, b::6, c::6, d::6>>
+      do_decode(rest, result <> decoded_block, padding?)
     end
+  end
+
+  # fallback
+  defp do_decode(_, _, _) do
+    {:error, :invalid_base64_encoding}
   end
 
   # todo: bench mark against previous version
